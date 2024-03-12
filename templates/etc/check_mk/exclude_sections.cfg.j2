@@ -1,0 +1,5 @@
+#!/bin/sh
+# managed by ansible
+{% for i in check_mk_agent_exclude_sections | default([]) %}
+{{ i }} 
+{% endfor %}

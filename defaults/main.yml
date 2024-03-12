@@ -1,0 +1,2 @@
+---
+checkmk_agent_user: "{{ automation_user | default('automation') }}"

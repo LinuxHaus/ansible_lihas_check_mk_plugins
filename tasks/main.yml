@@ -1,0 +1,78 @@
+---
+- name: Include lihas_variables
+  ansible.legacy.include_role:
+    name: lihas_variables
+  when: role_done_lihas_variables is not defined
+- name: Collect plugins
+  ansible.builtin.set_fact:
+    check_mk_plugins_list: |
+      {{ check_mk_plugins_list | default([]) +
+      hostvars[inventory_hostname][item]['config']['check_mk']['agent']['plugins'] | default([]) }}
+    cacheable: false
+  loop: "{{ configspaces }}"
+- name: Debug check_mk_plugins_list
+  ansible.builtin.debug:
+    var: check_mk_plugins_list
+    verbosity: 1
+- name: "Create plugin directories"
+  ansible.builtin.file:
+    path: "/usr/lib/check_mk_agent/plugins/{{ item.cache | default('') }}"
+    mode: "0755"
+    state: directory
+  when: item.type | default ('add') == 'add'
+  with_items: "{{ check_mk_plugins_list }}"
+- name: "Remove plugins"
+  ansible.builtin.file:
+    path: "/usr/lib/check_mk_agent/plugins/{{ item.cache | default('') }}/{{ item.name }}"
+    state: absent
+  when: item.type == 'remove'
+  with_items: "{{ check_mk_plugins_list }}"
+- name: "Download plugins"
+  ansible.builtin.uri:
+    url: "{{ checkmk_agent_plugin_server }}/{{ item.name }}"
+    validate_certs: "{{ checkmk_agent_server_validate_certs | bool }}"
+    dest: "/usr/lib/check_mk_agent/plugins/{{ item.cache | default('') }}/{{ item.name }}"
+    mode: "0755"
+    method: GET
+    status_code: [200, 304]
+    headers:
+      Authorization: "Bearer {{ checkmk_agent_user }} {{ checkmk_agent_secret }}"
+      Accept: "application/octet-stream"
+  when: item.type == 'add'
+  register: checkmk_agent_plugin_download_state
+  changed_when: checkmk_agent_plugin_download_state.status is defined and checkmk_agent_plugin_download_state.status == 200
+  with_items: "{{ check_mk_plugins_list }}"
+- name: Collect exclude_sections for lxc
+  ansible.builtin.set_fact:
+    check_mk_agent_exclude_sections: |
+      {{ check_mk_agent_exclude_sections | default([]) +
+      [ item ] }}
+    cacheable: false
+  loop:
+    - "MK_SKIP_CHRONY=yes"
+    - "MK_SKIP_DRBD=yes"
+    - "MK_SKIP_IPMISENSORS=yes"
+    - "MK_SKIP_IPMITOOL=yes"
+    - "MK_SKIP_MULTIPATHING=yes"
+    - "MK_SKIP_TIMESYNCHRONISATION=yes"
+    - "MK_SKIP_ARECA=yes"
+    - "MK_SKIP_THREE_WARE_RAID=yes"
+    - "MK_SKIP_MEGARAID=yes"
+    - "MK_SKIP_DM_RAID=yes"
+    - "MK_SKIP_MD=yes"
+    - "MK_SKIP_THERMAL=yes"
+  when: ansible_virtualization_type == 'lxc'
+- name: Collect exclude_sections from variables
+  ansible.builtin.set_fact:
+    check_mk_agent_exclude_sections: |
+      {{ check_mk_agent_exclude_sections | default([]) +
+      hostvars[inventory_hostname][item]['config']['check_mk']['agent']['exclude_sections'] | default([]) }}
+    cacheable: false
+  loop: "{{ configspaces }}"
+- name: "Template /etc/checkmk/exclude_sections.cfg"
+  ansible.builtin.template:
+    src: etc/check_mk/exclude_sections.cfg.j2
+    dest: /etc/check_mk/exclude_sections.cfg
+    mode: "0644"
+  become: "{{ lihas_become | default(false) }}"
+...
