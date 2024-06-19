@@ -20,8 +20,13 @@ ansible-playbook -i localhost, check_mk.yml
 ## Variables
 ```
 # add/remove check-mk-agent plugins via apt
-X.config.check_mk.agent.plugins.add: []
-X.config.check_mk.agent.plugins.remove: []
+X.config.check_mk.agent.plugins.[].name: Plugin Name
+X.config.check_mk.agent.plugins.[].type:
+    * add
+    * remove
+X.config.check_mk.agent.plugins.[].cache:
+    * Cache Time
+
 ```
 
 ## Example Playbook
