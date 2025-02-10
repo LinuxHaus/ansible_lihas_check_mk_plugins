@@ -3,6 +3,17 @@
   ansible.legacy.include_role:
     name: lihas_variables
   when: role_done_lihas_variables is not defined
+- name: Lihas_become init
+  ansible.builtin.set_fact:
+    lihas_become: false
+  tags:
+    - always
+- name: Check if become is necessary
+  ansible.builtin.set_fact:
+    lihas_become: true
+  when: ansible_effective_user_id != 0
+  tags:
+    - always
 - name: Collect plugins
   ansible.builtin.set_fact:
     check_mk_plugins_list: |
